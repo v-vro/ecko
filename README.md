@@ -8,7 +8,7 @@ Requires Node.js 22 or newer.
 
 ```bash
 npm install
-cp .env.example .env   # add your Gemini key (ElevenLabs and Tiger Data are optional)
+cp .env.example .env   # add your Gemini, ElevenLabs and Tiger Data keys
 npm start
 ```
 
