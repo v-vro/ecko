@@ -1,6 +1,6 @@
 # Ecko
 
-A classroom companion for teachers with ALS. Ecko understands slurred speech, writes the whiteboard as the teacher talks, draws diagrams when asked, and can speak in the teacher's own voice whenever they choose. Built at BioHacks 2026.
+A classroom companion for teachers with ALS. Ecko understands slurred speech, writes the whiteboard as the teacher talks, draws diagrams when asked, and can speak in the teacher's own voice whenever they choose.
 
 ## Run it
 
