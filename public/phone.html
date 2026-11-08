@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fffdf9">
+<title>Ecko</title>
+<link rel="icon" href="/assets/logo-head.png">
+<link rel="apple-touch-icon" href="/assets/logo-head.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* The phone in his pocket. Everything is big and works by feel with one weak hand: two toggles on top, two huge
+     buttons below, nothing small to aim for. Soft illustrated cards in the logo's greens and warm creams, with leaves
+     and flowers on them; vines run down both sides. On a wide screen the app stays phone-width so the garden shows. */
+  :root {
+    --paper: #fffdf9; --ink: #2d2a32; --ink-2: #5d5866; --muted: #9a96a0; --line: #ece6dc;
+    --leaf: #6bb34a; --forest: #33612a;
+    --sage: #e8f4dd; --sage-edge: #b9dca1; --sage-ink: #2f5a26;
+    --butter: #fff2cf; --butter-edge: #f0d38a; --butter-ink: #7a4f12;
+    --coral: #ffe4e1; --coral-edge: #ff8f8a; --coral-ink: #b4302c;
+    --lilac: #f0e7ff; --lilac-edge: #b894f6; --lilac-ink: #5b35b0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--paper); color: var(--ink); font: 500 17px/1.3 Fredoka, system-ui, sans-serif; overflow: hidden; }
+  .app {
+    position: relative; z-index: 1; height: 100dvh; max-width: 460px; margin: 0 auto;
+    display: grid; grid-template-rows: auto auto 1fr 1fr auto; gap: 14px;
+    padding: max(10px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom));
+  }
+
+  /* ---- header: logo + My speech ---- */
+  header { display: flex; align-items: center; justify-content: space-between; }
+  header img { height: 50px; display: block; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; background: #fff;
+          border: 2px solid var(--sage-edge); color: var(--forest); text-decoration: none; font-weight: 600; font-size: 15px;
+          box-shadow: 0 3px 0 var(--sage-edge); }
+  .pill svg { width: 20px; height: 20px; }
+
+  /* ---- shared card look: soft fill, coloured edge, a solid "lip" underneath that squashes when pressed ---- */
+  .card { position: relative; font: inherit; border-radius: 26px; border: 2.5px solid var(--edge); background: var(--fill);
+          color: var(--text); box-shadow: 0 6px 0 var(--edge); transition: transform .08s, box-shadow .08s, background .2s;
+          cursor: pointer; overflow: visible; }
+  .card:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--edge); }
+  .card .deco { position: absolute; pointer-events: none; transform-origin: var(--o, 50% 100%); transition: transform .25s;
+                animation: sway var(--d, 5s) ease-in-out infinite alternate; }
+  .card:active .deco { transform: rotate(var(--kick, 12deg)) scale(1.06); } /* leaves flick when you press */
+  @keyframes sway { from { rotate: -3deg; } to { rotate: 3deg; } }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--forest); outline-offset: 3px; }
+
+  /* ---- toggles: Mic and Clear voice ---- */
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .toggle { --fill: #fff; --edge: var(--line); --text: var(--ink); text-align: left; padding: 14px 14px 12px; min-height: 124px;
+            display: grid; align-content: space-between; }
+  .toggle svg.icon { width: 36px; height: 36px; }
+  .toggle .name { font-size: 20px; font-weight: 700; }
+  .toggle .state { display: inline-block; margin-top: 4px; font-size: 13px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+                   background: #f3efe8; color: var(--ink-2); }
+  #mic.on { --fill: var(--coral); --edge: var(--coral-edge); --text: var(--coral-ink); }
+  #mic.on .state { background: var(--coral-edge); color: #fff; }
+  #mic.on.hearing { box-shadow: 0 6px 0 var(--edge), 0 0 0 7px #ff8f8a55; }
+  #clear.on { --fill: var(--lilac); --edge: var(--lilac-edge); --text: var(--lilac-ink); }
+  #clear.on .state { background: var(--lilac-edge); color: #fff; }
+  #clear.suggested:not(.on) { --edge: var(--lilac-edge); animation: glow 1.1s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow: 0 6px 0 var(--edge), 0 0 0 0 #b894f688; } to { box-shadow: 0 6px 0 var(--edge), 0 0 0 11px #b894f600; } }
+
+  /* ---- the two big buttons ---- */
+  .big { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 14px; min-height: 120px; }
+  .big svg.icon { width: 50px; height: 50px; }
+  .big .name { font-size: clamp(28px, 8.4vw, 36px); font-weight: 700; }
+  .big .hint { font-size: 14px; opacity: .8; }
+  #repeat { --fill: var(--sage); --edge: var(--sage-edge); --text: var(--sage-ink); }
+  #recap { --fill: var(--butter); --edge: var(--butter-edge); --text: var(--butter-ink); }
+
+  /* ---- status ---- */
+  #status { min-height: 2.6em; font-size: 15px; color: var(--ink-2); text-align: center; padding: 0 34px;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #status.suggest { color: var(--lilac-ink); font-weight: 600; }
+
+  /* ---- vines down both sides, garden along the bottom, behind the app ---- */
+  .vines { position: fixed; top: -20px; bottom: 0; width: 120px; display: flex; flex-direction: column; pointer-events: none; z-index: 0; overflow: hidden; }
+  .vines img { height: 34vh; width: auto; margin-top: -4vh; }
+  /* hug the 460px app column on wide screens; on a phone that works out to the screen edges */
+  .vines.left { left: max(-34px, calc(50% - 230px - 96px)); }
+  .vines.right { right: max(-34px, calc(50% - 230px - 96px)); transform: scaleX(-1); }
+  .vines img:nth-child(even) { transform: scaleX(-1); }
+  .garden { position: fixed; left: max(0px, calc(50% - 330px)); right: max(0px, calc(50% - 330px)); bottom: 0; height: 90px; pointer-events: none; z-index: 0; }
+  .garden img { position: absolute; bottom: -4px; }
+  @media (prefers-reduced-motion: reduce) { .card .deco, #clear.suggested { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="vines left" aria-hidden="true">
+    <img src="/assets/vine-hanging.png" alt=""><img src="/assets/vine-curly.png" alt=""><img src="/assets/vine-hanging.png" alt=""><img src="/assets/vine-curly.png" alt="">
+  </div>
+  <div class="vines right" aria-hidden="true">
+    <img src="/assets/vine-curly.png" alt=""><img src="/assets/vine-hanging.png" alt=""><img src="/assets/vine-curly.png" alt=""><img src="/assets/vine-hanging.png" alt="">
+  </div>
+  <div class="garden" aria-hidden="true">
+    <img src="/assets/flower-patch.png" style="left:-6px;height:74px" alt="">
+    <img src="/assets/pebbles.png" style="left:38%;height:18px;bottom:6px" alt="">
+    <img src="/assets/rocks-grey.png" style="right:70px;height:42px" alt="">
+    <img src="/assets/bush.png" style="right:-26px;height:84px" alt="">
+  </div>
+
+  <div class="app">
+    <header>
+      <img src="/assets/logo.png" alt="Ecko">
+      <a class="pill" href="/insights" aria-label="My speech: your speaking rate and patterns">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h16M7 16v-4M12 16V7M17 16v-6"/></svg>
+        My speech
+      </a>
+    </header>
+
+    <div class="toggles">
+      <button class="card toggle" id="mic" aria-pressed="false">
+        <img class="deco" src="/assets/leaf-light.png" style="width:34px;right:-8px;top:-14px;--o:20% 90%;--d:4.5s;--kick:-14deg" alt="">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16"/>
+        </svg>
+        <span><span class="name">Mic</span><br><span class="state">Off</span></span>
+      </button>
+      <!-- Clear voice: everything he says is re-spoken through the classroom speakers in his clear voice -->
+      <button class="card toggle" id="clear" aria-pressed="false">
+        <img class="deco" src="/assets/flower-cream.png" style="width:30px;right:-6px;top:-12px;--d:6s" alt="">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+        </svg>
+        <span><span class="name">Clear voice</span><br><span class="state">Off</span></span>
+      </button>
+    </div>
+
+    <button class="card big" id="repeat">
+      <img class="deco" src="/assets/leaf-sprig.png" style="width:64px;left:-16px;top:-22px;--o:30% 90%;--d:5s;--kick:-16deg;transform:rotate(-30deg)" alt="">
+      <img class="deco" src="/assets/leaf-dark.png" style="width:40px;right:-10px;bottom:-14px;--o:20% 90%;--d:6.5s;--kick:18deg" alt="">
+      <img class="deco" src="/assets/flower-red-small.png" style="width:26px;left:30px;top:-12px;--d:4s" alt="">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 12a8 8 0 0 1 13.7-5.6L20 9M20 4v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 15M4 20v-5h5"/>
+      </svg>
+      <span class="name">Say that again</span>
+      <span class="hint">Shows and speaks your last sentence</span>
+    </button>
+    <button class="card big" id="recap">
+      <img class="deco" src="/assets/flower-orange.png" style="width:44px;right:-12px;top:-16px;--d:5.5s;--kick:-18deg" alt="">
+      <img class="deco" src="/assets/flower-cream-2.png" style="width:30px;right:30px;top:-10px;--d:4.2s" alt="">
+      <img class="deco" src="/assets/leaf-sprig-dark.png" style="width:56px;left:-14px;bottom:-16px;--o:30% 90%;--d:6s;--kick:14deg" alt="">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6h11M9 12h11M9 18h7M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>
+      </svg>
+      <span class="name">Recap now</span>
+      <span class="hint">Sums up the class, out loud</span>
+    </button>
+
+    <div id="status" aria-live="polite">Tap Mic to start the class.</div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const status = (s, suggest = false) => { $('status').textContent = s; $('status').classList.toggle('suggest', suggest); };
+const buzz = (pattern) => navigator.vibrate?.(pattern);
+const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  .catch(() => status('Offline: check connection'));
+let listening = false;
+
+// ---------- Audio → Gemini: the words on the board come from here ----------
+// Browser speech recognition silently drops words it can't make out, which is exactly the slurred words we need.
+// So we record the audio itself, cut it at pauses, and let Gemini transcribe it with the lesson as context.
+const RATE = 16000;         // sent as 16 kHz mono WAV
+// At 1.3 s, halting speech came through as one-word pieces ("Here is", "axons") that Gemini couldn't make sense of
+// alone; 2 s keeps a struggled-over sentence together. The server still joins pieces across longer pauses.
+const PAUSE_MS = 2000;      // this much quiet ends a piece
+const MAX_MS = 15000;       // never hold more than this in one piece
+const MIN_SPEECH_MS = 500;  // ignore clicks, bumps and single syllables
+let ctx, stream, proc, chunks = [], preroll = [], speechMs = 0, silentMs = 0, noise = 0.004;
+
+async function startAudio() {
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  ctx = new AudioContext();
+  const source = ctx.createMediaStreamSource(stream);
+  proc = ctx.createScriptProcessor(4096, 1, 1);
+  proc.onaudioprocess = (e) => onFrame(new Float32Array(e.inputBuffer.getChannelData(0)), ctx.sampleRate);
+  source.connect(proc);
+  proc.connect(ctx.destination); // required for the processor to run; it outputs silence
+}
+
+function stopAudio() {
+  if (chunks.length) flush(ctx.sampleRate);
+  proc?.disconnect();
+  stream?.getTracks().forEach((t) => t.stop());
+  ctx?.close();
+  chunks = []; preroll = [];
+  $('mic').classList.remove('hearing');
+}
+
+function onFrame(frame, sr) {
+  let sum = 0;
+  for (const v of frame) sum += v * v;
+  const rms = Math.sqrt(sum / frame.length), ms = (frame.length / sr) * 1000;
+  const loud = rms > Math.max(0.012, noise * 3);  // speech = clearly above the room's background level
+  if (!loud) noise = noise * 0.95 + rms * 0.05;   // learn the background level while quiet
+  $('mic').classList.toggle('hearing', loud);
+  if (!chunks.length) {                           // waiting for speech; keep a little audio before it starts
+    preroll.push(frame);
+    if (preroll.length > 3) preroll.shift();
+    if (loud) { chunks = preroll; preroll = []; speechMs = ms; silentMs = 0; }
+    return;
+  }
+  chunks.push(frame);
+  if (loud) { speechMs += ms; silentMs = 0; } else silentMs += ms;
+  if (silentMs >= PAUSE_MS || chunks.length * ms >= MAX_MS) flush(sr);
+}
+
+function flush(sr) {
+  const pieces = chunks;
+  chunks = [];
+  if (speechMs < MIN_SPEECH_MS) return;
+  fetch('/api/audio', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: toWav(pieces, sr) })
+    .catch(() => status('Offline: check connection'));
+}
+
+// Float32 samples at the mic's rate → 16 kHz 16-bit mono WAV (averaging down, which also filters out high hiss).
+function toWav(pieces, sr) {
+  const n = pieces.reduce((a, p) => a + p.length, 0), all = new Float32Array(n);
+  let o = 0;
+  for (const p of pieces) { all.set(p, o); o += p.length; }
+  const r = sr / RATE, len = Math.floor(n / r), pcm = new Int16Array(len);
+  for (let i = 0; i < len; i++) {
+    const a = Math.floor(i * r), b = Math.min(n, Math.floor((i + 1) * r));
+    let s = 0;
+    for (let j = a; j < b; j++) s += all[j];
+    pcm[i] = Math.max(-1, Math.min(1, s / Math.max(1, b - a))) * 0x7fff;
+  }
+  const buf = new ArrayBuffer(44 + pcm.byteLength), dv = new DataView(buf);
+  const str = (off, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); dv.setUint32(4, 36 + pcm.byteLength, true); str(8, 'WAVE'); str(12, 'fmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, RATE, true);
+  dv.setUint32(28, RATE * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, pcm.byteLength, true);
+  new Int16Array(buf, 44).set(pcm);
+  return buf;
+}
+
+// ---------- Live captions only: Chrome's recognition shows words as they're spoken ----------
+// It is not used for the notes (it drops slurred words), so if it fails nothing important is lost.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, lastInterim = 0;
+function startCaptions() {
+  if (!SR) return;
+  rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-CA';
+  rec.onresult = (e) => {
+    const text = [...e.results].slice(e.resultIndex).map((r) => r[0].transcript).join(' ');
+    if (Date.now() - lastInterim > 250) { lastInterim = Date.now(); post('/api/speech', { text, final: false }); }
+    status(text);
+  };
+  rec.onerror = () => {};
+  rec.onend = () => { if (listening) try { rec.start(); } catch {} };
+  rec.start();
+}
+
+// ---------- Mic: on / off ----------
+function showMic() {
+  $('mic').classList.toggle('on', listening);
+  $('mic').setAttribute('aria-pressed', listening);
+  $('mic').querySelector('.state').textContent = listening ? 'On · listening' : 'Off';
+  $('mic').querySelector('.slash').style.display = listening ? 'none' : '';
+}
+$('mic').onclick = async () => {
+  listening = !listening;
+  showMic();
+  buzz(listening ? [60] : [60, 80, 60]);
+  if (!listening) { rec?.stop(); stopAudio(); status('Mic is off.'); return; }
+  try { await startAudio(); } catch (err) { listening = false; showMic(); status('Mic: ' + err.message); return; }
+  status('Listening…');
+  startCaptions();
+};
+showMic();
+
+// ---------- Clear voice: on / off ----------
+let clearVoice = false;
+const showClear = () => {
+  $('clear').classList.toggle('on', clearVoice);
+  $('clear').setAttribute('aria-pressed', clearVoice);
+  $('clear').querySelector('.state').textContent = clearVoice ? 'On' : 'Off';
+  if (clearVoice) $('clear').classList.remove('suggested');
+};
+$('clear').onclick = () => {
+  clearVoice = !clearVoice;
+  showClear();
+  buzz(clearVoice ? [40, 40, 40] : [120]);
+  post('/api/mode', { clearVoice });
+};
+// Stay in sync if it's switched elsewhere (or the page reloads mid-class).
+const events = new EventSource('/api/events');
+for (const name of ['init', 'mode']) events.addEventListener(name, (e) => { clearVoice = !!JSON.parse(e.data).clearVoice; showClear(); });
+// The fatigue tracker suggests Clear voice: a distinct buzz he can feel in his pocket, and the button glows. He decides.
+events.addEventListener('suggest', (e) => {
+  $('clear').classList.add('suggested');
+  status(JSON.parse(e.data).reason + ' Tap Clear voice to turn it on.', true);
+  buzz([200, 100, 200, 100, 200]);
+});
+
+$('repeat').onclick = () => { buzz(80); post('/api/action', { type: 'repeat' }); };
+$('recap').onclick = () => { buzz([80, 60, 80]); post('/api/action', { type: 'recap' }); };
+</script>
+</body>
+</html>

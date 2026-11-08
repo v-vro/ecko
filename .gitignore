@@ -1,0 +1,8 @@
+node_modules/
+.env
+.deploy.env
+logs/
+data/
+DEVPOST.md
+*.log
+TECHNICAL.md

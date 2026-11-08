@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fffdf9">
+<title>Ecko · My speech</title>
+<link rel="icon" href="/assets/logo-head.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Same paper, chalk and foliage as the board and the phone. Chart colours validated with the dataviz palette
+     validator (light, on #fffdf9): blue #3a86ff + orange #dd7414 pass every check incl. CVD ΔE ~30 and 3:1 contrast;
+     the "typical day" line is a recessive grey. Live vs sample days differ by shape (filled vs ring), not colour. */
+  :root {
+    --paper: #fffdf9; --ink: #2d2a32; --ink-2: #5d5866; --muted: #9a96a0; --line: #ece6dc; --card: #fff;
+    --today: #3a86ff; --typical: #b9b3a9; --morning: #3a86ff; --afternoon: #dd7414;
+    --red: #ff5a5f; --blue: #3a86ff; --green: #2dbf6c; --purple: #8f5cff; --purple-d: #6a3ad6; --warn: #b45309;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 500 16px/1.45 Fredoka, system-ui, sans-serif; overflow-x: hidden; }
+  .chalk {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 2.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 2.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+  }
+  main { position: relative; max-width: 760px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 16px 0; }
+
+  /* ---- header with foliage ---- */
+  header { position: relative; padding: 4px 0 6px; }
+  header .vine { position: absolute; right: -14px; top: -14px; height: 120px; pointer-events: none; }
+  header .leaf { position: absolute; right: 52px; top: -18px; width: 54px; transform: rotate(170deg); pointer-events: none; }
+  .back { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-2); text-decoration: none; font-weight: 600;
+          padding: 6px 12px 6px 6px; margin-left: -6px; border-radius: 999px; }
+  .back svg { width: 20px; height: 20px; }
+  h1 { margin: 4px 0 0; font-size: 34px; line-height: 1.1; color: var(--red); }
+  .date { color: var(--ink-2); margin: 2px 0 0; font-weight: 600; }
+  .date .tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+  .tag.live { background: #e7f0ff; color: #1f4fa3; }
+  .tag.sample { background: #f1ede6; color: var(--ink-2); }
+
+  h2 { font-size: 21px; margin: 0; }
+  .sub { color: var(--ink-2); margin: 2px 0 12px; font-size: 14px; }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 22px; padding: 16px; margin: 14px 0; box-shadow: 0 4px 0 var(--line); }
+
+  /* ---- suggestion ---- */
+  #suggest { display: none; background: #f4ecff; border-color: #d6bcff; box-shadow: 0 4px 0 #d6bcff; }
+  #suggest.show { display: block; }
+  #suggest p { margin: 0 0 12px; font-weight: 600; color: var(--purple-d); }
+
+  /* ---- buttons ---- */
+  .btn { font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 11px 18px; cursor: pointer;
+         display: inline-flex; align-items: center; gap: 8px; }
+  .btn svg { width: 20px; height: 20px; }
+  .btn.primary { background: var(--purple); color: #fff; box-shadow: 0 4px 0 var(--purple-d); }
+  .btn.primary:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--purple-d); }
+  .btn.quiet { background: #fff; color: var(--ink); border: 2px solid var(--line); }
+  .btn[disabled] { opacity: .6; }
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  /* ---- calendar ---- */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-head button { font: inherit; font-size: 22px; width: 42px; height: 42px; border-radius: 50%; border: 2px solid var(--line);
+                     background: #fff; color: var(--ink); cursor: pointer; }
+  .cal-head button[disabled] { opacity: .35; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+  .cal-grid .dow { font-size: 12px; color: var(--muted); font-weight: 600; padding-bottom: 4px; }
+  .day { font: inherit; font-weight: 600; aspect-ratio: 1; border: 0; border-radius: 14px; background: transparent; color: var(--ink);
+         display: grid; place-items: center; align-content: center; gap: 2px; cursor: pointer; position: relative; padding: 0; }
+  .day i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+  .day i.live { background: var(--blue); }
+  .day i.sample { border: 2px solid var(--blue); }
+  .day i.none { visibility: hidden; }
+  .day:disabled { color: #cfc9c0; cursor: default; }
+  .day.today { box-shadow: inset 0 0 0 2px var(--red); }
+  .day.sel { background: var(--blue); color: #fff; box-shadow: 0 3px 0 #1f63d6; }
+  .day.sel i.live { background: #fff; }
+  .day.sel i.sample { border-color: #fff; }
+  .cal-key { display: flex; gap: 16px; justify-content: center; font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+  .cal-key i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+
+  /* ---- hero + tiles ---- */
+  .hero .label { color: var(--ink-2); font-weight: 600; }
+  .hero .value { font-size: 64px; font-weight: 700; line-height: 1; margin: 6px 0 4px; }
+  .hero .value small { font-size: 18px; font-weight: 600; color: var(--ink-2); }
+  .hero .empty { font-size: 18px; color: var(--muted); margin: 10px 0; }
+  .delta { font-weight: 600; color: var(--ink-2); }
+  .delta.down { color: var(--warn); }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .tile { background: #fbf8f2; border-radius: 16px; padding: 10px 12px; }
+  .tile .label { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .tile .value { font-size: 24px; font-weight: 700; }
+  .tile .vs { color: var(--muted); font-size: 12px; }
+  @media (max-width: 400px) { .tile { padding: 8px; } .tile .value { font-size: 20px; } }
+
+  /* ---- charts ---- */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 14px; color: var(--ink-2); margin-bottom: 6px; }
+  .zoom { display: inline-flex; background: #f3efe8; border-radius: 999px; padding: 3px; margin-bottom: 8px; }
+  .zoom button { font: inherit; font-size: 13px; font-weight: 600; border: 0; background: transparent; color: var(--ink-2);
+                 padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .zoom button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+  .key { display: inline-block; width: 16px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .chart { position: relative; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart text { font: 500 12px Fredoka, sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .chart .end { fill: var(--ink); font-weight: 600; font-size: 13px; }
+  .chart .thresh-label { fill: var(--warn); font-weight: 600; paint-order: stroke; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
+  .chart .nodata { fill: var(--muted); font-size: 14px; }
+  .tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; border-radius: 10px; padding: 6px 10px;
+         font-size: 13px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); display: none; z-index: 2; }
+
+  /* ---- tables ---- */
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--blue); list-style: none; display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 999px; background: #eef4ff; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: '▾'; }
+  details[open] summary::after { content: '▴'; }
+  .table-wrap { margin-top: 10px; border-radius: 14px; overflow: hidden; border: 2px solid var(--line); max-height: 320px; overflow-y: auto; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 14px; }
+  th { position: sticky; top: 0; background: #fbf8f2; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+       color: var(--ink-2); padding: 8px 10px; }
+  td { padding: 8px 10px; border-top: 1px solid var(--line); }
+  tr:nth-child(even) td { background: #fdfbf7; }
+  td .badge { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: #f1ede6; color: var(--ink-2); }
+  td .badge.live { background: #e7f0ff; color: #1f4fa3; }
+
+  /* ---- clinic letter ---- */
+  .clinic { position: relative; overflow: hidden; }
+  .clinic .sprig { position: absolute; right: -10px; top: -14px; width: 74px; transform: rotate(200deg); opacity: .9; pointer-events: none; }
+  .clinic .btn.primary { font-size: 17px; padding: 14px 22px; }
+  .letter { display: none; margin-top: 14px; background: #fffaf0; border: 2px dashed #e6dccb; border-radius: 16px; padding: 16px 18px; }
+  .letter.show { display: block; }
+  .letter .to { font-size: 13px; color: var(--ink-2); font-weight: 600; margin-bottom: 8px; }
+  .letter .body { white-space: pre-wrap; margin: 0; line-height: 1.55; }
+  .letter .fine { font-size: 12px; color: var(--muted); margin-top: 12px; }
+  #summary-status { color: var(--ink-2); font-size: 14px; }
+
+  .note { color: var(--muted); font-size: 13px; margin: 18px 4px 0; }
+  /* garden strip at the very bottom of the page */
+  .garden { position: relative; height: 96px; margin-top: 10px; pointer-events: none; }
+  .garden img { position: absolute; bottom: 0; }
+
+  @media print {
+    .back, #suggest, .btn, details, .cal, .garden, header .vine, header .leaf, .clinic .sprig { display: none !important; }
+    body { background: #fff; }
+    .card { break-inside: avoid; box-shadow: none; border-color: #ddd; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img class="vine" src="/assets/vine-curly.png" alt="">
+    <img class="leaf" src="/assets/leaf-dark.png" alt="">
+    <a class="back" href="/phone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      Back
+    </a>
+    <h1 class="chalk">My speech</h1>
+    <p class="date" id="date"></p>
+  </header>
+
+  <section class="card" id="suggest" role="alert">
+    <p id="suggest-text"></p>
+    <div class="row">
+      <button class="btn primary" id="suggest-yes">Turn on Clear voice</button>
+      <button class="btn quiet" id="suggest-no">Not now</button>
+    </div>
+  </section>
+
+  <section class="card cal" aria-label="Choose a day">
+    <div class="cal-head">
+      <button id="prev" aria-label="Previous month">‹</button>
+      <h2 class="chalk" id="month"></h2>
+      <button id="next" aria-label="Next month">›</button>
+    </div>
+    <div class="cal-grid" id="cal"></div>
+    <div class="cal-key">
+      <span><i style="background:var(--blue)"></i>Measured live</span>
+      <span><i style="border:2px solid var(--blue)"></i>Sample data</span>
+    </div>
+  </section>
+
+  <section class="card hero">
+    <div class="label" id="hero-label">Speaking rate now</div>
+    <div id="hero-value"></div>
+    <div class="delta" id="hero-delta"></div>
+    <div class="tiles">
+      <div class="tile"><div class="label">Pauses</div><div class="value" id="t-pause">–</div><div class="vs" id="t-pause-vs"></div></div>
+      <div class="tile"><div class="label">Words AI filled in</div><div class="value" id="t-inferred">–</div><div class="vs" id="t-inferred-vs"></div></div>
+      <div class="tile"><div class="label">Voice volume</div><div class="value" id="t-db">–</div><div class="vs" id="t-db-vs"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="chalk">Through the day</h2>
+    <p class="sub">Speaking rate across the school day, in words per minute.</p>
+    <div class="legend"><span><i class="key" style="background:var(--today)"></i><span id="legend-day">Today</span></span><span><i class="key" style="background:var(--typical)"></i>Typical day (4 weeks before)</span></div>
+    <div class="zoom" id="zoom" role="group" aria-label="Zoom">
+      <button data-zoom="fit" aria-pressed="true">Fit my speech</button><button data-zoom="day" aria-pressed="false">Whole day</button>
+    </div>
+    <div class="chart" id="chart-day"></div>
+    <details><summary>Show the numbers</summary><div class="table-wrap"><table id="table-day"></table></div></details>
+  </section>
+
+  <section class="card">
+    <h2 class="chalk">Over the weeks</h2>
+    <p class="sub">Average speaking rate in morning and afternoon classes, by week.</p>
+    <div class="legend"><span><i class="key" style="background:var(--morning)"></i>Mornings</span><span><i class="key" style="background:var(--afternoon)"></i>Afternoons</span></div>
+    <div class="chart" id="chart-weeks"></div>
+    <details><summary>Show the numbers</summary><div class="table-wrap"><table id="table-weeks"></table></div></details>
+  </section>
+
+  <section class="card clinic">
+    <img class="sprig" src="/assets/leaf-sprig.png" alt="">
+    <h2 class="chalk">For my ALS clinic</h2>
+    <p class="sub">A short summary of the last four weeks to share with your neurologist and speech-language pathologist between visits.</p>
+    <div class="row">
+      <button class="btn primary" id="summary-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+        Write a summary for my clinic
+      </button>
+      <span id="summary-status" aria-live="polite"></span>
+    </div>
+    <div class="letter" id="letter">
+      <div class="to" id="letter-to"></div>
+      <p class="body" id="summary-text"></p>
+      <p class="fine">Measured from classroom speech by Ecko. Information to support his care team, not a diagnosis.</p>
+      <div class="row" style="margin-top:12px">
+        <button class="btn quiet" id="print-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          Save as PDF
+        </button>
+        <button class="btn quiet" id="copy-btn">Copy text</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="note" id="note"></p>
+  <div class="garden" aria-hidden="true">
+    <img src="/assets/flower-patch.png" style="left:-6px;height:84px" alt="">
+    <img src="/assets/pebbles.png" style="left:40%;height:20px;bottom:6px" alt="">
+    <img src="/assets/rocks-grey.png" style="right:96px;height:44px" alt="">
+    <img src="/assets/bush.png" style="right:-20px;height:90px" alt="">
+  </div>
+</main>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const SVGNS = 'http://www.w3.org/2000/svg';
+const svgEl = (tag, attrs = {}, text) => {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text != null) e.textContent = text;
+  return e;
+};
+const el = (tag, cls, text) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, text != null ? { textContent: text } : {});
+const pct = (x) => `${Math.round(x * 100)}%`;
+const clock = (h) => { const hh = Math.floor(h), mm = Math.round((h - hh) * 60); return `${((hh + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'am' : 'pm'}`; };
+const dateOf = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
+const keyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const shortDate = (t) => new Date(t).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+const TODAY = keyOf(new Date());
+
+// One line chart, one y-axis, drawn at the container's real pixel width (text stays 12-13px on a phone).
+// Lines 2px round, dots r4 with a 2px surface ring, hairline solid grid, end labels in ink beside a coloured dot,
+// crosshair tooltip on hover and keyboard focus.
+function lineChart(host, opts) {
+  host._chart = opts;
+  const { series, x, y, threshold, xFmt } = opts;
+  const withData = series.filter((s) => s.points.length);
+  const longest = Math.max(8, ...withData.map((s) => `${s.name} ${s.points.at(-1).y}`.length));
+  const W = Math.max(280, host.clientWidth || 640), H = W < 480 ? 210 : 250, m = { l: 34, r: longest * 7.5 + 24, t: 12, b: 26 };
+  const sx = (v) => m.l + ((v - x.min) / (x.max - x.min)) * (W - m.l - m.r);
+  const sy = (v) => H - m.b - ((v - y.min) / (y.max - y.min)) * (H - m.t - m.b);
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': opts.label ?? '' });
+  for (const v of y.ticks) {
+    svg.append(svgEl('line', { x1: m.l, x2: W - m.r, y1: sy(v), y2: sy(v), stroke: '#ece6dc', 'stroke-width': 1 }));
+    svg.append(svgEl('text', { x: m.l - 8, y: sy(v) + 4, 'text-anchor': 'end' }, v));
+  }
+  const every = Math.ceil(x.ticks.length / Math.max(2, Math.floor((W - m.l - m.r) / 70)));
+  x.ticks.forEach((v, i) => i % every || svg.append(svgEl('text', { x: sx(v), y: H - 8, 'text-anchor': 'middle' }, xFmt(v))));
+  if (threshold) { // the one deliberately dashed line: a threshold, not a gridline
+    svg.append(svgEl('line', { x1: m.l, x2: W - m.r, y1: sy(threshold.y), y2: sy(threshold.y), stroke: '#b45309', 'stroke-width': 1, 'stroke-dasharray': '4 4' }));
+    svg.append(svgEl('text', { x: m.l + 4, y: sy(threshold.y) - 5, class: 'thresh-label' }, threshold.label));
+  }
+  if (opts.empty) svg.append(svgEl('text', { x: (m.l + W - m.r) / 2, y: m.t + 16, 'text-anchor': 'middle', class: 'nodata' }, opts.empty));
+  const ends = [];
+  for (const s of withData) {
+    if (s.points.length > 1) svg.append(svgEl('path', { d: s.points.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x)} ${sy(p.y)}`).join(' '),
+      fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    if (s.dots) for (const p of s.points) svg.append(svgEl('circle', { cx: sx(p.x), cy: sy(p.y), r: 4, fill: s.color, stroke: '#fff', 'stroke-width': 2 }));
+    const last = s.points.at(-1);
+    ends.push({ s, y: sy(last.y), v: last.y });
+  }
+  ends.sort((a, b) => a.y - b.y).forEach((e, i, arr) => { // skip a colliding end label rather than detach it from its line
+    if (i && e.y - arr[i - 1].y < 16) return;
+    svg.append(svgEl('circle', { cx: W - m.r + 10, cy: e.y, r: 4, fill: e.s.color }));
+    svg.append(svgEl('text', { x: W - m.r + 18, y: e.y + 4, class: 'end' }, `${e.s.name} ${e.v}`));
+  });
+  const cross = svgEl('line', { y1: m.t, y2: H - m.b, stroke: '#9a96a0', 'stroke-width': 1, visibility: 'hidden' });
+  const hit = svgEl('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent', tabindex: 0 });
+  svg.append(cross, hit);
+  const tip = el('div', 'tip');
+  host.replaceChildren(svg, tip);
+  const xs = [...new Set(withData.flatMap((s) => s.points.map((p) => p.x)))].sort((a, b) => a - b);
+  const showAt = (xv) => {
+    cross.setAttribute('x1', sx(xv)); cross.setAttribute('x2', sx(xv)); cross.setAttribute('visibility', 'visible');
+    tip.replaceChildren(el('b', '', xFmt(xv)));
+    for (const s of withData) {
+      const p = s.points.reduce((best, q) => (Math.abs(q.x - xv) < Math.abs(best.x - xv) ? q : best), s.points[0]);
+      if (Math.abs(p.x - xv) <= (s.near ?? Infinity)) tip.append(document.createElement('br'), `${s.name}: ${p.y} wpm`);
+    }
+    const r = svg.getBoundingClientRect();
+    tip.style.left = `${Math.min(Math.max((sx(xv) / W) * r.width, 70), r.width - 70)}px`;
+    tip.style.top = `${(m.t / H) * r.height + 8}px`;
+    tip.style.display = 'block';
+  };
+  const hide = () => { cross.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; };
+  hit.addEventListener('pointermove', (e) => {
+    if (!xs.length) return;
+    const r = svg.getBoundingClientRect(), xv = x.min + (((e.clientX - r.left) / r.width) * W - m.l) / (W - m.l - m.r) * (x.max - x.min);
+    showAt(xs.reduce((best, v) => (Math.abs(v - xv) < Math.abs(best - xv) ? v : best), xs[0]));
+  });
+  hit.addEventListener('pointerleave', hide);
+  hit.addEventListener('focus', () => xs.length && showAt(xs.at(-1)));
+  hit.addEventListener('blur', hide);
+}
+
+function table(id, head, rows) {
+  const t = $(id);
+  t.replaceChildren();
+  const tr = t.createTHead().insertRow();
+  for (const h of head) tr.append(el('th', '', h));
+  const body = t.createTBody();
+  for (const r of rows) { const row = body.insertRow(); for (const c of r) row.insertCell().append(c instanceof Node ? c : document.createTextNode(c)); }
+}
+const badge = (sample) => el('span', `badge ${sample ? '' : 'live'}`, sample ? 'sample' : 'live');
+const ticks = (lo, hi) => Array.from({ length: (hi - lo) / 20 + 1 }, (_, i) => lo + i * 20);
+
+// ---------- calendar ----------
+// The selected day lives in the address (#2026-11-05), so a day can be linked or bookmarked.
+const fromHash = () => (/^#\d{4}-\d{2}-\d{2}$/.test(location.hash) && location.hash.slice(1) <= TODAY ? location.hash.slice(1) : TODAY);
+let data = null, selected = fromHash(), view = dateOf(selected), dayZoom = 'fit';
+document.querySelectorAll('#zoom button').forEach((b) => { b.onclick = () => { dayZoom = b.dataset.zoom; render(data); }; });
+view.setDate(1);
+addEventListener('hashchange', () => { selected = fromHash(); view = dateOf(selected); view.setDate(1); load(); });
+function renderCalendar() {
+  const byDate = new Map(data.days.map((d) => [d.date, d]));
+  $('month').textContent = view.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+  const cells = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => el('div', 'dow', d));
+  const first = new Date(view), lead = (first.getDay() + 6) % 7; // Monday-first weeks
+  for (let i = 0; i < lead; i++) cells.push(el('div'));
+  const daysIn = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+  for (let n = 1; n <= daysIn; n++) {
+    const key = keyOf(new Date(view.getFullYear(), view.getMonth(), n)), info = byDate.get(key);
+    const b = el('button', 'day');
+    b.append(String(n), el('i', info ? (info.live ? 'live' : 'sample') : 'none'));
+    b.classList.toggle('today', key === TODAY);
+    b.classList.toggle('sel', key === selected);
+    b.disabled = key > TODAY || (!info && key !== TODAY);
+    b.setAttribute('aria-label', `${dateOf(key).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}${info ? (info.live ? ', measured live' : ', sample data') : ', no data'}`);
+    if (key === selected) b.setAttribute('aria-current', 'date');
+    b.onclick = () => { location.hash = key === TODAY ? '' : key; selected = key; load(); };
+    cells.push(b);
+  }
+  $('cal').replaceChildren(...cells);
+  $('next').disabled = view.getFullYear() === new Date().getFullYear() && view.getMonth() === new Date().getMonth();
+  const earliest = data.days.map((d) => d.date).sort()[0];
+  $('prev').disabled = !earliest || keyOf(view) <= earliest.slice(0, 8) + '01';
+}
+$('prev').onclick = () => { view.setMonth(view.getMonth() - 1); renderCalendar(); };
+$('next').onclick = () => { view.setMonth(view.getMonth() + 1); renderCalendar(); };
+
+// ---------- the selected day ----------
+function render(d) {
+  const day = dateOf(d.day), isSample = d.points.some((p) => p.sample), long = day.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+  $('date').replaceChildren(d.today ? `Today · ${long}` : long);
+  if (d.points.length) $('date').append(el('span', `tag ${isSample ? 'sample' : 'live'}`, isSample ? 'Sample data' : 'Measured live'));
+  renderCalendar();
+
+  const n = d.now, mo = d.morning;
+  $('hero-label').textContent = d.today ? 'Speaking rate now' : 'Average speaking rate';
+  if (n) {
+    const v = el('div', 'value', String(n.wpm)); // no chalk mask: at this size it eats into the digits
+    v.append(el('small', '', ' words / min'));
+    $('hero-value').replaceChildren(v);
+    const diff = n.wpm / mo.wpm - 1;
+    $('hero-delta').textContent = `${Math.abs(Math.round(diff * 100))}% ${diff < 0 ? 'below' : 'above'} usual mornings (${mo.wpm})`
+      + (!d.today && d.afternoon ? ` · afternoons ${d.afternoon.wpm}` : '');
+    $('hero-delta').className = `delta ${diff < -0.1 ? 'down' : ''}`;
+    $('t-pause').textContent = pct(n.pause);
+    $('t-inferred').textContent = pct(n.inferredRate);
+    $('t-db').textContent = `${Math.round(n.db)} dB`;
+  } else {
+    $('hero-value').replaceChildren(el('div', 'empty', d.today ? 'No speech measured yet today. Turn the mic on in class.' : 'No class this day.'));
+    $('hero-delta').textContent = '';
+    for (const id of ['t-pause', 't-inferred', 't-db']) $(id).textContent = '–';
+  }
+  $('t-pause-vs').textContent = `usual mornings ${pct(mo.pause)}`;
+  $('t-inferred-vs').textContent = `usual mornings ${pct(mo.inferredRate)}`;
+  $('t-db-vs').textContent = `usual mornings ${Math.round(mo.db)} dB`;
+
+  // Through the day: the day's own pieces against a typical day (the 4 weeks before it).
+  const name = d.today ? 'Today' : shortDate(day);
+  $('legend-day').textContent = name;
+  const pts = d.points.map((p) => ({ x: +p.hour.toFixed(3), y: p.wpm }));
+  // Zoom: "Fit my speech" spans just the time he spoke (a few minutes of class otherwise collapses into one tower on a
+  // phone); "Whole day" is 8:30-4:30 against the typical day.
+  const fit = dayZoom === 'fit' && pts.length > 0;
+  let x;
+  if (fit) {
+    const lo = Math.min(...pts.map((p) => p.x)), hi = Math.max(...pts.map((p) => p.x)), pad = Math.max(1 / 12, (hi - lo) * 0.08);
+    const min = lo - pad, max = Math.max(hi + pad, min + 1 / 3), span = max - min;                  // at least 20 minutes wide
+    const step = span <= 0.75 ? 1 / 12 : span <= 2 ? 0.25 : span <= 5 ? 1 : 2;                      // 5 min … 2 h ticks
+    x = { min, max, ticks: [] };
+    for (let t = Math.ceil(min / step) * step; t <= max; t += step) x.ticks.push(+t.toFixed(4));
+  } else {
+    const lastHour = Math.max(16.5, ...pts.map((p) => p.x + 0.25));
+    x = { min: 8.5, max: lastHour, ticks: [9, 11, 13, 15, ...(lastHour > 17 ? [17] : [])] };
+  }
+  const typical = d.typical.filter((p) => !fit || (p.hour >= x.min - 0.5 && p.hour <= x.max + 0.5)).map((p) => ({ x: p.hour, y: p.wpm }));
+  const all = [...pts.map((p) => p.y), ...typical.map((p) => p.y), d.threshold];
+  const yMin = Math.max(0, Math.floor((Math.min(...all) - 10) / 20) * 20), yMax = Math.ceil((Math.max(...all) + 10) / 20) * 20;
+  document.querySelectorAll('#zoom button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.zoom === dayZoom));
+  lineChart($('chart-day'), {
+    label: `Speaking rate through ${name} compared with a typical day`,
+    series: [
+      { name: 'Typical', color: 'var(--typical)', points: typical.filter((p) => p.x >= x.min && p.x <= x.max), near: 0.5 },
+      { name, color: 'var(--today)', points: pts, dots: true, near: fit ? (x.max - x.min) / 20 : 0.5 },
+    ],
+    x,
+    y: { min: yMin, max: yMax, ticks: ticks(yMin, yMax) },
+    threshold: { y: d.threshold, label: `Clear voice suggested below ${d.threshold}`.replace('suggested below', '↓') },
+    xFmt: clock,
+    empty: pts.length ? null : 'No speech measured this day',
+  });
+  table('table-day', ['Time', 'Words/min', 'Pauses', 'Filled in', ''],
+    d.points.map((p) => [clock(p.hour), p.wpm, pct(p.pause), `${p.inferred} of ${p.words}`, badge(p.sample)]));
+
+  const weeks = d.weekly.map((w, i) => ({ ...w, i }));
+  const wv = weeks.flatMap((w) => [w.morning, w.afternoon]).filter(Boolean);
+  const wMin = Math.floor((Math.min(...wv) - 10) / 20) * 20, wMax = Math.ceil((Math.max(...wv) + 10) / 20) * 20;
+  lineChart($('chart-weeks'), {
+    label: 'Average morning and afternoon speaking rate by week',
+    series: [
+      { name: 'Mornings', color: 'var(--morning)', points: weeks.filter((w) => w.morning).map((w) => ({ x: w.i, y: w.morning })), dots: true },
+      { name: 'Afternoons', color: 'var(--afternoon)', points: weeks.filter((w) => w.afternoon).map((w) => ({ x: w.i, y: w.afternoon })), dots: true },
+    ],
+    x: { min: -0.3, max: Math.max(1, weeks.length - 1) + 0.3, ticks: weeks.map((w) => w.i) },
+    y: { min: wMin, max: wMax, ticks: ticks(wMin, wMax) },
+    xFmt: (i) => shortDate(weeks[Math.round(i)]?.week),
+  });
+  table('table-weeks', ['Week of', 'Mornings', 'Afternoons', ''],
+    weeks.map((w) => [shortDate(w.week), w.morning ?? '–', w.afternoon ?? '–', badge(w.sample)]));
+
+  $('note').textContent = `${d.totals.measured} pieces of speech measured live by the classroom mic so far. Days before today are sample data `
+    + `built from the case file (165 words/min at 9 am, 118 at 4 pm), for this demonstration. Only these numbers are kept, never what was said. `
+    + `This is information for you and your clinic, not a diagnosis.`
+    + (d.store === 'tiger' ? ` Stored in Tiger Data: raw measurements are deleted after 120 days, and only half-hour totals are kept.` : '');
+}
+
+async function load() {
+  data = await (await fetch(`/api/insights?day=${selected}`)).json();
+  render(data);
+}
+load();
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => document.querySelectorAll('.chart').forEach((c) => c._chart && lineChart(c, c._chart)), 150);
+});
+
+// ---------- live: new measurements refresh today; a suggestion shows the Clear voice prompt ----------
+const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const es = new EventSource('/api/events');
+es.addEventListener('speech', () => selected === TODAY && load());
+es.addEventListener('suggest', (e) => {
+  $('suggest-text').textContent = `${JSON.parse(e.data).reason} Turn on Clear voice, so the class hears you in your clear voice?`;
+  $('suggest').classList.add('show');
+  navigator.vibrate?.([80, 60, 80]);
+});
+$('suggest-yes').onclick = () => { post('/api/mode', { clearVoice: true }); $('suggest').classList.remove('show'); };
+$('suggest-no').onclick = () => $('suggest').classList.remove('show');
+
+// ---------- clinic summary ----------
+$('summary-btn').onclick = async () => {
+  $('summary-status').textContent = 'Writing…';
+  $('summary-btn').disabled = true;
+  try {
+    const res = await fetch('/api/clinic-summary', { method: 'POST' });
+    const text = await res.text();
+    if (!res.ok) throw new Error(text);
+    const end = new Date(), start = new Date(Date.now() - 28 * 864e5);
+    $('letter-to').textContent = `To: ALS clinic team · Speech between visits, ${shortDate(start)} – ${shortDate(end)}`;
+    $('summary-text').textContent = text;
+    $('letter').classList.add('show');
+    $('summary-status').textContent = '';
+  } catch (err) {
+    $('summary-status').textContent = err.message || 'Could not write the summary.';
+  } finally {
+    $('summary-btn').disabled = false;
+  }
+};
+$('print-btn').onclick = () => print();
+$('copy-btn').onclick = async () => {
+  await navigator.clipboard?.writeText(`${$('letter-to').textContent}\n\n${$('summary-text').textContent}`);
+  $('copy-btn').textContent = 'Copied';
+  setTimeout(() => { $('copy-btn').textContent = 'Copy text'; }, 1500);
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecko · Board</title>
+<link rel="icon" href="/assets/logo-head.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Projector-first: solid light background, big chalky-but-readable type, bright accents. */
+  :root {
+    --paper: #fffdf9; --ink: #2d2a32; --muted: #9a96a0; --line: #e8e3da;
+    --chalk-red: #ff5a5f; --chalk-blue: #3a86ff; --chalk-green: #2dbf6c; --chalk-yellow: #ffbe0b; --chalk-purple: #8f5cff;
+  }
+  html, body { height: 100%; margin: 0; }
+  body {
+    color: var(--ink); font: 500 1.9vw/1.35 Fredoka, system-ui, sans-serif; overflow: hidden;
+    display: grid; grid-template-rows: auto 1fr auto; /* header / scrolling board / caption bar */
+    background: var(--paper);
+  }
+  /* Chalky text: a speckle mask rendered once and tiled. Cheap enough for a long page, unlike a live SVG filter per
+     block (which made a 12-block board take 50+ s to paint without a GPU). Diagrams keep the richer filter. */
+  .chalk {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 2.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 2.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+  }
+
+  header { display: flex; align-items: baseline; gap: 1.2vw; padding: 1.4vw 6vw .6vw; border-bottom: 2px dashed var(--line); }
+  h1 { margin: 0; font-size: 3.2vw; font-weight: 700; color: var(--chalk-red); }
+  h1:empty::before { content: "Today's class"; color: var(--muted); }
+  #status { flex: 1; font-size: .85vw; color: var(--muted); }
+  #mode-badge { font-size: .9vw; font-weight: 600; color: #fff; background: var(--chalk-green); border-radius: 999px; padding: .3em 1em; }
+  header #sound-btn { color: #fff; background: var(--chalk-red); border-color: var(--chalk-red); font-weight: 600; }
+  #status.error { color: var(--chalk-red); }
+  header button { font: 500 .9vw Fredoka, sans-serif; color: var(--muted); background: transparent; cursor: pointer;
+                  border: 2px dashed var(--line); border-radius: 999px; padding: .3em 1em; }
+  header button:hover { color: var(--ink); border-color: var(--muted); }
+
+  /* The board: one long page. New blocks are added at the bottom and it scrolls like a document. */
+  /* no smooth scroll: it fires mid-way scroll events that look like a manual scroll-up. Edges fade so content
+     scrolling out of view softens instead of being sliced off. */
+  #page { overflow-y: auto; padding: 1.5vw 6vw 4vw; min-height: 0;
+          -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.2vw, #000 calc(100% - 3vw), transparent);
+                  mask-image: linear-gradient(to bottom, transparent, #000 1.2vw, #000 calc(100% - 3vw), transparent); }
+  #page:empty::before { content: 'Waiting for the teacher…'; color: var(--muted); }
+  .block.new { animation: write-in .7s ease-out; } /* revealed left to right, like being written */
+  @keyframes write-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  @media (prefers-reduced-motion: reduce) { .block, .drawing { animation: none; } }
+  .note { position: relative; margin: .35em 0; padding-left: 1.6em; }
+  .note::before { content: ''; position: absolute; left: .3em; top: .5em; width: .55em; height: .55em; border-radius: 50%; background: var(--dot); }
+  .note.raw { color: var(--muted); font-style: italic; }
+  .heading { margin: 1em 0 .3em; font-size: 2.5vw; font-weight: 700; color: var(--chalk-blue); }
+  .heading::first-letter { text-transform: uppercase; }
+  .visual { margin: 1.2em 16vw 1.6em 0; } /* right margin keeps diagrams clear of the gecko */
+  .visual .art { display: grid; place-items: center; }
+  .visual h3 { margin: 0 0 .4em; font-size: 1vw; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .visual svg { width: 100%; height: auto; max-height: 62vh; }
+  /* Image-model diagrams: background made transparent and cropped in drawImageSketch, so there is no box. */
+  .visual canvas.picture { display: block; max-width: 100%; max-height: 62vh; width: auto; height: auto; }
+  .flow svg { max-height: 40vh; }
+  .drawing { font-size: 1.6vw; color: var(--muted); padding: 3vw 0; animation: breathe 1.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: .35; } }
+  .sketch .label { font: 600 24px Fredoka, sans-serif; fill: var(--ink); }
+  .sketch .leader { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 6 5; stroke-linecap: round; fill: none; }
+  .sketch .pin { fill: var(--ink); }
+  .flow .step { font: 600 26px Fredoka, sans-serif; fill: var(--ink); }
+
+  /* Live caption and gecko float over the bottom of the page. */
+  /* Its own row at the bottom, so the board's scroll area ends above it and nothing slides underneath. */
+  #caption { margin: 0 25vw 1.4vw 8vw; font-size: 1.6vw; color: var(--muted); font-style: italic;
+             border-top: 2px dashed var(--line); padding-top: .5vw; min-height: 1.4em; }
+  #caption:empty::before { content: 'Listening for the teacher…'; opacity: .6; }
+  #caption mark.inferred { background: #fff1b8; color: var(--ink); font-style: normal; border-radius: .3em; padding: 0 .2em; }
+  #jump { position: fixed; right: 23vw; bottom: 5vw; font: 600 1vw Fredoka, sans-serif; color: var(--paper); background: var(--ink);
+          border: 0; border-radius: 999px; padding: .5em 1.2em; cursor: pointer; display: none; }
+  #jump.show { display: block; }
+
+  /* Gecko mascot, bottom right, standing in front of the bush. Above the recap backdrop: he is the one "talking". */
+  #gecko { position: fixed; right: 3vw; bottom: .6vw; width: 18vw; height: 21vw; z-index: 6; }
+  #gecko img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: bottom center;
+               visibility: hidden; transform-origin: 50% 100%; }
+  #gecko[data-pose="listening"] [data-for="listening"],
+  #gecko[data-pose="writing"] [data-for="writing"],
+  #gecko[data-pose="talking"] [data-for="talking"] { visibility: visible; }
+  /* Writing: choppy stop-motion sway, four held frames. Talking: smooth hover. */
+  #gecko[data-pose="writing"] [data-for="writing"] { animation: sway .8s steps(1, end) infinite; }
+  #gecko[data-pose="talking"] [data-for="talking"] { animation: hover 1.1s ease-in-out infinite; }
+  @keyframes sway { 0% { transform: rotate(-5deg); } 25% { transform: rotate(0); } 50% { transform: rotate(5deg); } 75% { transform: rotate(0); } }
+  @keyframes hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7%); } }
+  @media (prefers-reduced-motion: reduce) { #gecko img { animation: none !important; } }
+
+  /* Hand-drawn nature decorations, kept to the corners and side gutters so they never cover the board's content. */
+  .decor img, .cluster { position: fixed; pointer-events: none; z-index: 2; }
+  .cluster { width: 0; height: 0; }
+  .cluster img { position: absolute; left: var(--x); top: var(--y); width: var(--w); transform: rotate(var(--r)); }
+  .c-top-left { left: 0; top: 0; }
+  .c-top-right { right: 0; top: 0; transform: scaleX(-1); }   /* mirrored: offsets count in from the right edge */
+  .fan { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 2; }
+  .fan img { position: absolute; left: var(--dx, 0); top: var(--dy, 0); width: var(--w); transform-origin: var(--sx) var(--sy);
+             /* rotate about the stem, then move the stem onto the root point */
+             transform: translate(calc(var(--sx) * -1), calc(var(--sy) * -1)) rotate(calc(var(--a) + var(--b))); }
+  .fan .bloom { left: var(--x); top: var(--y); transform: translate(-50%, -50%); }
+  .fan-left { left: -.8vw; top: 46vh; }
+  .fan-right { right: -.8vw; top: 34vh; transform: scaleX(-1); } /* mirrored: same fan growing in from the right */
+  .c-bottom-left { left: 0; bottom: 0; }
+  .d-pebbles { right: 20vw; bottom: .5vw; height: 3.4vw; }
+  .d-bush { right: 0; bottom: 0; width: 19vw; }
+
+  /* Repeat / recap card: always fits the window (text shrinks to fit), sits left of the gecko. */
+  #overlay { position: fixed; inset: 0; z-index: 5; background: rgb(45 42 50 / .3); display: none; place-items: center;
+             padding: 4vh 22vw 4vh 4vw; }
+  #overlay.show { display: grid; }
+  #overlay .sheet { background: var(--paper); border-radius: 18px; padding: 2.5vw 3.5vw; box-sizing: border-box;
+                    max-width: 100%; max-height: 92vh; overflow: hidden;
+                    box-shadow: 0 1vw 3vw rgb(0 0 0 / .25); border: 3px solid var(--line); }
+  #overlay small { display: block; font-size: 1.2vw; letter-spacing: .14em; color: var(--chalk-red); margin-bottom: .6em; font-weight: 700; }
+  dialog { width: min(48rem, 90vw); border: 0; border-radius: 16px; font: 500 16px Fredoka, sans-serif; background: var(--paper); color: var(--ink); }
+  dialog textarea { width: 100%; height: 16rem; font: inherit; box-sizing: border-box; border: 2px solid var(--line); border-radius: 10px; padding: .6rem; }
+  dialog menu { display: flex; justify-content: flex-end; gap: .5rem; padding: 0; margin: .75rem 0 0; }
+  dialog button { font: inherit; padding: .4em 1em; border-radius: 999px; border: 2px solid var(--line); background: #fff; cursor: pointer; }
+  .upload { display: block; padding: .9rem 1rem; border: 2px dashed var(--chalk-green); border-radius: 12px; cursor: pointer; }
+  .upload span { font-weight: 600; color: var(--chalk-green); }
+  .upload small { display: block; color: var(--muted); margin-top: .2rem; }
+  .upload input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .upload:focus-within { outline: 3px solid var(--chalk-blue); }
+  #lesson-status { min-height: 1.2em; margin: .5rem 0; color: var(--muted); }
+  #lesson-status.error { color: var(--chalk-red); }
+
+  /* "Download notes" = the browser's Save as PDF: just the notes and diagrams, as one long clean document. */
+  @media print {
+    @page { margin: 14mm; }
+    html, body { height: auto; overflow: visible; display: block; background: #fff; }
+    header { border: 0; padding: 0 0 4mm; }
+    header button, #status, #mode-badge, #caption, #jump, .decor, #gecko, #overlay { display: none !important; }
+    #page { overflow: visible; padding: 0; -webkit-mask-image: none; mask-image: none; }
+    .visual { margin-right: 0; break-inside: avoid; }
+    .heading { break-after: avoid; }
+    .note { break-inside: avoid; }
+    .visual svg, .visual canvas.picture { max-height: 120mm; }
+  }
+</style>
+</head>
+<body>
+  <!-- Chalk filters (grainy speckle + slightly rough edges, kept subtle so text stays readable) and the arrowhead. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#3a3a3a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <filter id="chalk-text" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7" result="noise"/>
+      <feColorMatrix in="noise" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3 2.4" result="speckle"/>
+      <feComposite in="SourceGraphic" in2="speckle" operator="in" result="grainy"/>
+      <feDisplacementMap in="grainy" in2="noise" scale="1.6"/>
+    </filter>
+    <filter id="chalk-shape" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>
+      <feColorMatrix in="noise" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.6 2.2" result="speckle"/>
+      <feComposite in="SourceGraphic" in2="speckle" operator="in" result="grainy"/>
+      <feDisplacementMap in="grainy" in2="noise" scale="3"/>
+    </filter>
+  </svg>
+
+  <header>
+    <h1 id="title" class="chalk"></h1>
+    <span id="status" aria-live="polite"></span>
+    <span id="mode-badge" hidden>Clear voice on</span>
+    <button id="sound-btn" hidden>🔊 Turn on sound</button>
+    <button id="lesson-btn">Lesson plan</button>
+    <button id="print-btn">Download notes</button>
+    <button id="reset-btn">New class</button>
+  </header>
+  <main id="page"></main>
+  <div id="caption" aria-live="polite"></div>
+  <button id="jump">↓ Latest</button>
+  <!-- Foliage peeking in from the edges, like looking out through a canopy. Each cluster's leaves overlap, with their
+       stems off-screen; --x/--y/--w are offsets in vw from the cluster's edge, --r is the rotation. -->
+  <div class="decor" aria-hidden="true">
+    <div class="cluster c-top-left">
+      <img src="/assets/leaf-sprig.png" style="--x:-1.4vw;--y:-3vw;--w:6vw;--r:160deg" alt="">
+      <img src="/assets/vine-hanging.png" style="--x:.6vw;--y:-.5vw;--w:4.4vw;--r:0deg" alt="">
+      <img src="/assets/leaf-dark.png" style="--x:-2.6vw;--y:-1.8vw;--w:5.4vw;--r:120deg" alt="">
+    </div>
+    <div class="cluster c-top-right">
+      <img src="/assets/leaf-sprig-dark.png" style="--x:-1.6vw;--y:-3vw;--w:6vw;--r:165deg" alt="">
+      <img src="/assets/vine-curly.png" style="--x:.4vw;--y:-.5vw;--w:5vw;--r:0deg" alt="">
+      <img src="/assets/leaf-light.png" style="--x:-2.6vw;--y:-1.6vw;--w:5vw;--r:125deg" alt="">
+    </div>
+    <!-- Side blooms: leaves fan out across a half circle from just off-screen (--a: 0deg = up the edge, 90deg = in
+         toward the board, 180deg = down). --sx/--sy is where each leaf's stem is in its image and --b turns it to
+         point straight up first (both measured from the PNGs). Roots are spread along the edge (--dy) and long vine
+         tendrils run up and down, so it blooms outward instead of bunching. Pieces that point along the edge are the
+         long ones; inward-pointing ones stay short, so the bloom never reaches the notes. -->
+    <div class="fan fan-left">
+      <img src="/assets/vine-hanging.png" style="--sx:54.7%;--sy:3.7%;--b:-180deg;--a:4deg;--w:4.6vw;--dy:-2.6vw" alt="">
+      <img src="/assets/vine-curly.png" style="--sx:44.7%;--sy:4.1%;--b:-180deg;--a:174deg;--w:4.8vw;--dy:2.6vw" alt="">
+      <img src="/assets/leaf-sprig-dark.png" style="--sx:29.8%;--sy:91.6%;--b:-21.9deg;--a:18deg;--w:8.6vw;--dy:-2.2vw" alt="">
+      <img src="/assets/leaf-sprig.png" style="--sx:32.6%;--sy:91.3%;--b:-20.7deg;--a:162deg;--w:8.2vw;--dy:2.2vw" alt="">
+      <img src="/assets/leaf-light.png" style="--sx:23.5%;--sy:89.8%;--b:-24.4deg;--a:42deg;--w:6.4vw;--dy:-1.4vw" alt="">
+      <img src="/assets/leaf-dark.png" style="--sx:20.4%;--sy:89.9%;--b:-29.7deg;--a:138deg;--w:6.2vw;--dy:1.4vw" alt="">
+      <img src="/assets/leaf-veined.png" style="--sx:84.9%;--sy:88.6%;--b:35.6deg;--a:66deg;--w:4.6vw;--dy:-.6vw" alt="">
+      <img src="/assets/leaf-olive.png" style="--sx:70.3%;--sy:88.7%;--b:24.6deg;--a:114deg;--w:4.4vw;--dy:.6vw" alt="">
+      <img src="/assets/leaf-sprig-dark.png" style="--sx:29.8%;--sy:91.6%;--b:-21.9deg;--a:90deg;--w:4.6vw" alt="">
+      <img src="/assets/flower-red-small.png" class="bloom" style="--x:3.6vw;--y:-5.4vw;--w:2vw" alt="">
+      <img src="/assets/flower-orange.png" class="bloom" style="--x:1.2vw;--y:-.8vw;--w:3vw" alt="">
+      <img src="/assets/flower-cream-2.png" class="bloom" style="--x:.5vw;--y:1.8vw;--w:2.4vw" alt="">
+      <img src="/assets/flower-peach.png" class="bloom" style="--x:3vw;--y:5.6vw;--w:1.8vw" alt="">
+    </div>
+    <div class="fan fan-right">
+      <img src="/assets/vine-curly.png" style="--sx:44.7%;--sy:4.1%;--b:-180deg;--a:6deg;--w:4.6vw;--dy:-2.6vw" alt="">
+      <img src="/assets/vine-hanging.png" style="--sx:54.7%;--sy:3.7%;--b:-180deg;--a:176deg;--w:4.2vw;--dy:2.6vw" alt="">
+      <img src="/assets/leaf-sprig.png" style="--sx:32.6%;--sy:91.3%;--b:-20.7deg;--a:20deg;--w:8.4vw;--dy:-2.2vw" alt="">
+      <img src="/assets/leaf-sprig-dark.png" style="--sx:29.8%;--sy:91.6%;--b:-21.9deg;--a:160deg;--w:8vw;--dy:2.2vw" alt="">
+      <img src="/assets/leaf-dark.png" style="--sx:20.4%;--sy:89.9%;--b:-29.7deg;--a:44deg;--w:6vw;--dy:-1.4vw" alt="">
+      <img src="/assets/leaf-veined.png" style="--sx:84.9%;--sy:88.6%;--b:35.6deg;--a:136deg;--w:5.2vw;--dy:1.4vw" alt="">
+      <img src="/assets/leaf-light.png" style="--sx:23.5%;--sy:89.8%;--b:-24.4deg;--a:68deg;--w:4.8vw;--dy:-.6vw" alt="">
+      <img src="/assets/leaf-olive.png" style="--sx:70.3%;--sy:88.7%;--b:24.6deg;--a:112deg;--w:4.4vw;--dy:.6vw" alt="">
+      <img src="/assets/flower-cream.png" class="bloom" style="--x:3.4vw;--y:4.8vw;--w:2vw" alt="">
+      <img src="/assets/flower-red.png" class="bloom" style="--x:1.2vw;--y:-.8vw;--w:3vw" alt="">
+      <img src="/assets/flower-peach.png" class="bloom" style="--x:.5vw;--y:1.9vw;--w:2.2vw" alt="">
+      <img src="/assets/flower-red-small.png" class="bloom" style="--x:3vw;--y:-5vw;--w:1.8vw" alt="">
+    </div>
+    <div class="cluster c-bottom-left">
+      <img src="/assets/leaf-sprig-dark.png" style="--x:-3vw;--y:-9vw;--w:6.4vw;--r:60deg" alt="">
+      <img src="/assets/leaf-light.png" style="--x:-2.6vw;--y:-5.6vw;--w:5vw;--r:80deg" alt="">
+      <img src="/assets/flower-patch.png" style="--x:.4vw;--y:-6.8vw;--w:6.6vw;--r:0deg" alt="">
+    </div>
+    <img src="/assets/pebbles.png" class="d-pebbles" alt="">
+    <img src="/assets/bush.png" class="d-bush" alt="">
+  </div>
+  <!-- all three poses loaded up front so switching never flickers -->
+  <div id="gecko" data-pose="listening" aria-hidden="true">
+    <img src="/assets/gecko-listening.png" data-for="listening" alt="">
+    <img src="/assets/gecko-writing.png" data-for="writing" alt="">
+    <img src="/assets/gecko-talking.png" data-for="talking" alt="">
+  </div>
+
+  <div id="overlay" role="dialog"><div class="sheet"><small id="overlay-label" class="chalk"></small><div id="overlay-text" class="chalk"></div></div></div>
+  <dialog id="lesson-dialog">
+    <form method="dialog">
+      <p><strong>Today's lesson plan or topic.</strong> Used to work out slurred words and keep notes on topic.</p>
+      <label class="upload">
+        <input type="file" id="lesson-file" accept=".pdf,.txt,.md,image/*">
+        <span>Upload a lesson plan</span> <small>PDF, photo of your notes, or text file. Word or PowerPoint: save as PDF first.</small>
+      </label>
+      <p id="lesson-status" aria-live="polite"></p>
+      <textarea id="lesson-text" placeholder="…or type the topic, e.g. Cellular respiration: glycolysis, Krebs cycle, electron transport chain, ATP synthase"></textarea>
+      <menu><button value="cancel">Cancel</button><button value="save" id="lesson-save">Save</button></menu>
+    </form>
+  </dialog>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const SVGNS = 'http://www.w3.org/2000/svg';
+const DOTS = ['--chalk-blue', '--chalk-green', '--chalk-yellow', '--chalk-purple', '--chalk-red'];
+const FILLS = ['#ffe066', '#9bd4ff', '#a6f0a8', '#ffadb0', '#d6bcff', '#ffc999'];
+let hideTimer;
+
+// ---------- small helpers ----------
+const wrap = (s, max = 14) => { // split a long name over two lines
+  const words = s.split(' ');
+  const cut = s.length > max && words.length > 1 ? Math.ceil(words.length / 2) : words.length;
+  return [words.slice(0, cut).join(' '), words.slice(cut).join(' ')].filter(Boolean);
+};
+const el = (tag, cls, text) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, text != null ? { textContent: text } : {});
+const svgEl = (tag, attrs = {}) => {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+};
+const svgText = (lines, attrs, lineH) => {
+  const text = svgEl('text', attrs);
+  lines.forEach((line, i) => {
+    const t = svgEl('tspan', { x: attrs.x, dy: i ? lineH : 0 });
+    t.textContent = line;
+    text.append(t);
+  });
+  return text;
+};
+const fitView = (svg, pad = 16) => {
+  const bb = svg.getBBox();
+  svg.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.width + 2 * pad} ${bb.height + 2 * pad}`);
+};
+
+// ---------- gecko: talking while speaking or a repeat/recap is up, writing while the board updates, else listening ----------
+const gecko = { writing: false, drawing: false, speaking: false };
+function setPose() {
+  $('gecko').dataset.pose = gecko.speaking || $('overlay').classList.contains('show') ? 'talking'
+    : gecko.writing || gecko.drawing ? 'writing' : 'listening';
+}
+setPose();
+
+// ---------- flow: chalky boxes and arrows ----------
+// Chains and cycles, which cover high-school processes.
+function drawFlow(b, host) {
+  const steps = b.steps, n = steps.length, H = 86, cycle = b.cycle && n >= 3;
+  // All boxes share the width of the longest wrapped label (~15 px per character at 26 px Fredoka semibold).
+  const W = Math.max(210, ...steps.flatMap((s) => wrap(s, 13)).map((line) => line.length * 15 + 44));
+  let pos;
+  if (cycle) { // around an ellipse, starting at the top, clockwise
+    const rx = Math.max(250, n * 60), ry = Math.max(150, n * 34);
+    pos = steps.map((_, i) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / n; return { x: rx * Math.cos(a), y: ry * Math.sin(a) }; });
+  } else { // one row, or snake into rows of 4 so long processes stay big
+    const per = n <= 4 ? n : 4;
+    pos = steps.map((_, i) => { const r = Math.floor(i / per), c = i % per; return { x: (r % 2 ? per - 1 - c : c) * (W + 80), y: r * (H + 70) }; });
+  }
+  // Point where the line from a box centre towards (dx, dy) leaves the box, plus a small gap.
+  const edge = (p, dx, dy) => {
+    const t = Math.min(W / 2 / Math.abs(dx || 1e-9), H / 2 / Math.abs(dy || 1e-9)), len = Math.hypot(dx, dy);
+    return { x: p.x + dx * t + (dx / len) * 10, y: p.y + dy * t + (dy / len) * 10 };
+  };
+  const svg = svgEl('svg', { 'aria-label': `${cycle ? 'Cycle' : 'Process'}: ${steps.join(', ')}` });
+  const shapes = svgEl('g', { filter: 'url(#chalk-shape)' }), words = svgEl('g', { filter: 'url(#chalk-text)' });
+  const links = steps.slice(1).map((_, i) => [i, i + 1]);
+  if (cycle) links.push([n - 1, 0]);
+  for (const [i, j] of links) {
+    const a = pos[i], c = pos[j], s = edge(a, c.x - a.x, c.y - a.y), e = edge(c, a.x - c.x, a.y - c.y);
+    const mx = (s.x + e.x) / 2, my = (s.y + e.y) / 2, bow = cycle ? 0.22 : 0; // cycles bow outward along the loop
+    shapes.append(svgEl('path', { d: `M${s.x} ${s.y} Q${mx * (1 + bow)} ${my * (1 + bow)} ${e.x} ${e.y}`, fill: 'none',
+      stroke: '#3a3a3a', 'stroke-width': 4, 'stroke-linecap': 'round', 'marker-end': 'url(#arrow)' }));
+  }
+  steps.forEach((step, i) => {
+    const p = pos[i], lines = wrap(step, 13);
+    shapes.append(svgEl('rect', { x: p.x - W / 2, y: p.y - H / 2, width: W, height: H, rx: 24, fill: FILLS[i % FILLS.length], stroke: '#3a3a3a', 'stroke-width': 4 }));
+    words.append(svgText(lines, { class: 'step', x: p.x, y: p.y - (lines.length - 1) * 14 + 9, 'text-anchor': 'middle' }, 28));
+  });
+  svg.append(shapes, words);
+  host.replaceChildren(svg);
+  fitView(svg);
+}
+
+// ---------- sketch fallback (SVG): only if the image model fails. The model draws named shapes, we place the labels ----------
+// Only plain shape elements and drawing attributes survive: no scripts, links, text or styles from the model.
+const OK_TAGS = new Set(['svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon']);
+const OK_ATTRS = new Set(['d', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'width', 'height', 'x1', 'y1', 'x2', 'y2', 'points',
+  'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'opacity', 'fill-opacity',
+  'stroke-opacity', 'fill-rule', 'transform', 'data-part', 'viewBox']);
+function sanitize(src) {
+  const root = new DOMParser().parseFromString(src, 'image/svg+xml').documentElement;
+  if (root.localName !== 'svg') return null;
+  const clean = (e) => {
+    for (const a of [...e.attributes]) if (!OK_ATTRS.has(a.name) || /url\s*\(|javascript:/i.test(a.value)) e.removeAttribute(a.name);
+    for (const c of [...e.children]) OK_TAGS.has(c.localName) ? clean(c) : c.remove();
+  };
+  clean(root);
+  return document.importNode(root, true);
+}
+
+function drawSketch(b, host) {
+  const art = sanitize(b.svg);
+  if (!art) { host.replaceChildren(el('div', 'drawing', `Couldn't draw the ${b.subject}.`)); return; }
+  if (!art.getAttribute('viewBox')) art.setAttribute('viewBox', '0 0 500 500');
+  // Drop any background rectangle (not a labelled part, covers most of the canvas): the board is the background.
+  const [, , vw, vh] = art.getAttribute('viewBox').split(/[\s,]+/).map(Number);
+  const size = (v, full) => (v?.endsWith('%') ? (parseFloat(v) / 100) * full : parseFloat(v) || 0);
+  for (const r of art.querySelectorAll('rect')) {
+    if (!r.closest('[data-part]') && size(r.getAttribute('width'), vw) * size(r.getAttribute('height'), vh) >= 0.6 * vw * vh) r.remove();
+  }
+  // Lines are never filled: an open path (dendrite, nerve) that inherits a group's fill renders as a pink crescent.
+  for (const el of art.querySelectorAll('path, polyline, line')) {
+    const open = el.localName !== 'path' || !/z/i.test(el.getAttribute('d') ?? '');
+    if (open && !el.hasAttribute('fill')) el.setAttribute('fill', 'none');
+  }
+  art.setAttribute('x', 0); art.setAttribute('y', 0); art.setAttribute('width', 500); art.setAttribute('height', 500);
+  art.setAttribute('filter', 'url(#chalk-shape)');
+  // Drawing sits at 0..500; labels get side gutters of 250 units.
+  const outer = svgEl('svg', { viewBox: '-250 -10 1000 520', 'aria-label': `Diagram of ${b.subject}` });
+  outer.append(art);
+  host.replaceChildren(outer); // must be in the DOM before measuring
+
+  const map = outer.getScreenCTM().inverse();
+  const toOuter = (e, x, y) => new DOMPoint(x, y).matrixTransform(map.multiply(e.getScreenCTM()));
+  const toScreen = (p) => p.matrixTransform(outer.getScreenCTM());
+  // Is this point on a visible bit of the part (not hidden under another shape)?
+  const visibleOn = (partEl, p) => { const s = toScreen(p); return partEl.contains(document.elementFromPoint(s.x, s.y)); };
+  const geoms = (part) => part instanceof SVGGeometryElement ? [part] : [...part.querySelectorAll('path,circle,ellipse,rect,line,polyline,polygon')];
+
+  const seen = new Set();
+  const parts = [...art.querySelectorAll('[data-part]')].flatMap((partEl) => {
+    const name = partEl.getAttribute('data-part').trim();
+    const g = geoms(partEl);
+    if (!name || seen.has(name.toLowerCase()) || !g.length) return [];
+    seen.add(name.toLowerCase());
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const e of g) {
+      const bb = e.getBBox();
+      for (const [x, y] of [[bb.x, bb.y], [bb.x + bb.width, bb.y + bb.height]]) {
+        const p = toOuter(e, x, y);
+        x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+      }
+    }
+    return [{ name, el: partEl, g, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 }];
+  });
+
+  const labels = svgEl('g', { filter: 'url(#chalk-text)' });
+  const pins = []; // keep pins apart so neighbouring labels don't all point at one spot
+  const crowded = (a) => pins.some((q) => Math.hypot(q.x - a.x, q.y - a.y) < 45) ? 300 ** 2 : 0;
+  const spread = (col) => { // sort by wanted y, then push labels apart so none overlap
+    col.sort((a, c) => a.y - c.y);
+    const gap = 18;
+    for (let i = 1; i < col.length; i++) col[i].y = Math.max(col[i].y, col[i - 1].y + col[i - 1].h / 2 + col[i].h / 2 + gap);
+    if (col.length) col.at(-1).y = Math.min(col.at(-1).y, 500 - col.at(-1).h / 2);
+    for (let i = col.length - 2; i >= 0; i--) col[i].y = Math.min(col[i].y, col[i + 1].y - col[i + 1].h / 2 - col[i].h / 2 - gap);
+  };
+  // Left-most half of the parts get labels on the left, the rest on the right, so both sides stay balanced.
+  const byX = [...parts].sort((a, c) => a.cx - c.cx), half = Math.floor(byX.length / 2);
+  for (const side of ['left', 'right']) {
+    const col = side === 'left' ? byX.slice(0, half) : byX.slice(half);
+    for (const p of col) { p.lines = wrap(p.name); p.h = p.lines.length * 28; p.y = p.cy; }
+    spread(col);
+    const lx = side === 'left' ? -14 : 514;
+    for (const p of col) {
+      // Pin the leader to the visible point of this part nearest the label: sample its outlines, nudge each
+      // sample just inside the shape, and skip samples covered by other shapes (e.g. an axon under myelin).
+      let best, bestD = Infinity, fallback, fallbackD = Infinity;
+      for (const e of p.g) {
+        const len = e.getTotalLength?.() || 0;
+        if (!len) continue;
+        const bb = e.getBBox();
+        const c = toOuter(e, bb.x + bb.width / 2, bb.y + bb.height / 2);
+        for (let i = 0; i < 96; i++) {
+          const pt = e.getPointAtLength((len * i) / 96), q = toOuter(e, pt.x, pt.y);
+          const dx = c.x - q.x, dy = c.y - q.y, dist = Math.hypot(dx, dy) || 1, k = Math.min(6, dist) / dist;
+          const a = new DOMPoint(q.x + dx * k, q.y + dy * k);
+          const d = (a.x - lx) ** 2 + (a.y - p.y) ** 2 + crowded(a);
+          if (d < fallbackD) { fallbackD = d; fallback = a; }
+          if (d < bestD && (visibleOn(p.el, a) || visibleOn(p.el, q))) { bestD = d; best = visibleOn(p.el, a) ? a : q; }
+        }
+      }
+      p.pin = best ?? fallback;
+      if (p.pin) pins.push(p.pin);
+    }
+    // Re-order labels by where their pins landed so leader lines don't cross.
+    const placed = col.filter((p) => p.pin);
+    for (const p of placed) p.y = p.pin.y;
+    spread(placed);
+    for (const p of placed) {
+      labels.append(
+        svgEl('line', { class: 'leader', x1: side === 'left' ? -6 : 506, y1: p.y, x2: p.pin.x, y2: p.pin.y }),
+        svgEl('circle', { class: 'pin', cx: p.pin.x, cy: p.pin.y, r: 5 }),
+        svgText(p.lines, { class: 'label', x: lx, y: p.y - (p.lines.length - 1) * 14 + 8, 'text-anchor': side === 'left' ? 'end' : 'start' }, 28),
+      );
+    }
+  }
+  outer.append(labels);
+  fitView(outer); // zoom to the drawing plus its labels
+}
+
+// ---------- sketch from an image model: the picture already has its chalk labels ----------
+// Its background is a slightly grey or cream white. A white balance turns that background pure white (keeping the
+// chalk colours), then white is turned into transparency ("colour to alpha") and the empty margin is cropped, so the
+// diagram sits straight on the board's paper with no box. (A multiply blend didn't work: the page's fade mask
+// isolates it, so it showed a white rectangle.)
+function drawImageSketch(b, host) {
+  const img = new Image();
+  img.onload = () => {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const work = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = work.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, w, h), px = data.data;
+    // Background = the median colour of a 6 px frame around the edge.
+    const edge = [[], [], []];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (x > 5 && x < w - 6 && y > 5 && y < h - 6) continue;
+      const i = (y * w + x) * 4;
+      for (let k = 0; k < 3; k++) edge[k].push(px[i + k]);
+    }
+    const bg = edge.map((v) => v.sort((p, q) => p - q)[v.length >> 1] || 255);
+    let x0 = w, y0 = h, x1 = 0, y1 = 0;
+    for (let i = 0, n = 0; i < px.length; i += 4, n++) {
+      const c = [0, 1, 2].map((k) => Math.min(255, px[i + k] * 255 / bg[k]));
+      let a = 255 - Math.min(...c); // how far from white
+      a = a < 14 ? 0 : Math.min(255, (a - 14) * 255 / 241); // paper grain and faint shading → fully clear
+      for (let k = 0; k < 3; k++) px[i + k] = a ? Math.max(0, Math.min(255, (c[k] - 255 * (1 - a / 255)) / (a / 255))) : 255;
+      px[i + 3] = a;
+      if (a > 40) { const x = n % w, y = (n / w) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    ctx.putImageData(data, 0, 0);
+    const pad = 16;
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+    if (x1 <= x0 || y1 <= y0) { x0 = 0; y0 = 0; x1 = w - 1; y1 = h - 1; }
+    const c = Object.assign(document.createElement('canvas'), { width: x1 - x0 + 1, height: y1 - y0 + 1, className: 'picture' });
+    c.getContext('2d').drawImage(work, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
+    c.setAttribute('role', 'img');
+    c.setAttribute('aria-label', `Diagram: ${b.subject}`);
+    host.replaceChildren(c);
+    if (following) $('page').scrollTop = $('page').scrollHeight; // it arrived after the block was laid out
+  };
+  img.onerror = () => host.replaceChildren(el('div', 'drawing chalk', `Could not load the ${b.subject} drawing`));
+  img.src = b.img;
+}
+
+// ---------- the page: render blocks in order, only touching new or changed ones ----------
+const rendered = new Map(); // block id -> { node, ver }
+let noteCount = 0, following = true, loaded = false; // loaded: only blocks arriving live get the write-in animation
+
+function makeBlock(b) {
+  if (b.type === 'heading') return el('h2', 'block heading chalk', b.text);
+  if (b.type === 'note') {
+    const p = el('p', `block note chalk${b.raw ? ' raw' : ''}`, b.text);
+    p.style.setProperty('--dot', `var(${DOTS[noteCount++ % DOTS.length]})`);
+    return p;
+  }
+  const box = el('section', `block visual ${b.type}`);
+  box.append(el('h3', '', b.type === 'flow' ? (b.cycle ? 'Cycle' : 'Process') : b.subject), el('div', 'art'));
+  if (b.type === 'sketch' && !b.svg && !b.img) box.querySelector('.art').append(el('div', 'drawing chalk', `Drawing the ${b.subject}…`));
+  return box;
+}
+
+function renderBlocks(blocks) {
+  const page = $('page'), ids = new Set(blocks.map((b) => b.id));
+  for (const [id, r] of rendered) if (!ids.has(id)) { r.node.remove(); rendered.delete(id); }
+  if (!blocks.length) noteCount = 0;
+  let prev = null, changed = [];
+  for (const b of blocks) {
+    const ver = b.type === 'sketch' ? (b.img ? 'image' : b.svg ? 'drawn' : 'pending') : 'v';
+    let r = rendered.get(b.id);
+    if (!r || r.ver !== ver) {
+      const node = makeBlock(b);
+      if (loaded) node.classList.add('new');
+      if (r) r.node.replaceWith(node); else if (prev) prev.after(node); else page.prepend(node);
+      rendered.set(b.id, r = { node, ver });
+      changed.push([b, node]);
+    }
+    prev = r.node;
+  }
+  if (!changed.length) return;
+  if (following) page.scrollTop = page.scrollHeight; // keep the newest writing in view (jump, so drawings measure on screen)
+  for (const [b, node] of changed) {
+    const host = node.querySelector('.art');
+    if (b.type === 'flow') drawFlow(b, host);
+    if (b.type === 'sketch' && b.img) drawImageSketch(b, host);
+    else if (b.type === 'sketch' && b.svg) drawSketch(b, host);
+  }
+  if (following) page.scrollTop = page.scrollHeight;
+  else $('jump').classList.add('show');
+}
+
+// Follow new writing unless someone scrolled up to look back; "Latest" jumps back down.
+$('page').addEventListener('scroll', () => {
+  const p = $('page');
+  following = p.scrollTop + p.clientHeight >= p.scrollHeight - 120;
+  if (following) $('jump').classList.remove('show');
+  updateTitle();
+});
+$('jump').onclick = () => { following = true; $('page').scrollTop = $('page').scrollHeight; $('jump').classList.remove('show'); };
+
+// The big title shows the section you are in: the newest heading while following the live writing, otherwise the
+// last heading above the middle of the view. Falls back to the lesson topic before any heading exists.
+let lessonTitle = '';
+function updateTitle() {
+  const headings = [...$('page').querySelectorAll('.heading')];
+  const middle = $('page').getBoundingClientRect().top + $('page').clientHeight / 2;
+  const current = following ? headings.at(-1) : headings.findLast((h) => h.getBoundingClientRect().top < middle);
+  $('title').textContent = current?.textContent ?? lessonTitle;
+}
+
+function setBoard(board) {
+  lessonTitle = board.title;
+  renderBlocks(board.blocks);
+  updateTitle();
+}
+
+// ---------- overlay, lesson, reset ----------
+function show(label, text, ms = 12000) {
+  $('overlay-label').textContent = label;
+  $('overlay-text').textContent = text;
+  $('overlay').classList.add('show');
+  fitOverlay();
+  setPose();
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(hide, ms);
+}
+function hide() { $('overlay').classList.remove('show'); setPose(); }
+// Largest text size (up to 3.2vw) at which the whole card fits inside the window.
+function fitOverlay() {
+  const sheet = $('overlay').querySelector('.sheet'), text = $('overlay-text');
+  let size = 3.2;
+  text.style.fontSize = `${size}vw`;
+  while (size > 0.8 && (sheet.scrollHeight > sheet.clientHeight + 1 || sheet.scrollWidth > sheet.clientWidth + 1)) {
+    size -= 0.1;
+    text.style.fontSize = `${size}vw`;
+  }
+}
+addEventListener('resize', () => $('overlay').classList.contains('show') && fitOverlay());
+$('overlay').onclick = hide;
+
+const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+$('lesson-btn').onclick = () => $('lesson-dialog').showModal();
+
+// Upload: send the file as-is; the server has Gemini read it and the lesson text comes back (and to every board).
+const lessonStatus = (text, isError) => { $('lesson-status').textContent = text; $('lesson-status').classList.toggle('error', !!isError); };
+const TYPE_BY_EXT = { pdf: 'application/pdf', txt: 'text/plain', md: 'text/markdown', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic' };
+$('lesson-file').onchange = async () => {
+  const file = $('lesson-file').files[0];
+  if (!file) return;
+  const type = file.type || TYPE_BY_EXT[file.name.split('.').pop().toLowerCase()] || '';
+  lessonStatus(`Reading ${file.name}…`);
+  try {
+    const res = await fetch('/api/lesson-file', { method: 'POST', headers: { 'Content-Type': type }, body: file });
+    const text = await res.text();
+    if (!res.ok) return lessonStatus(text, true);
+    $('lesson-text').value = text;
+    lessonStatus(`Read ${file.name}. Check it below, then Save.`);
+  } catch {
+    lessonStatus('Could not upload: check the connection.', true);
+  } finally {
+    $('lesson-file').value = '';
+  }
+};
+
+// Download notes: the PDF is named after the lesson and shows the lesson title, not the section on screen.
+$('print-btn').onclick = () => print();
+addEventListener('beforeprint', () => {
+  document.title = `${lessonTitle || 'Class notes'} – ${new Date().toLocaleDateString('en-CA')}`;
+  $('title').textContent = lessonTitle || 'Class notes';
+});
+addEventListener('afterprint', () => { document.title = 'Board'; updateTitle(); });
+$('lesson-save').onclick = () => post('/api/lesson', { text: $('lesson-text').value });
+$('reset-btn').onclick = () => confirm('Clear the board and start a new class?') && post('/api/reset', {});
+
+// ---------- live events ----------
+const setStatus = (text, isError) => { $('status').textContent = text; $('status').classList.toggle('error', !!isError); };
+const es = new EventSource('/api/events');
+es.addEventListener('init', (e) => {
+  const s = JSON.parse(e.data);
+  $('lesson-text').value = s.lesson;
+  setBoard(s.board);
+  setMode(s);
+  loaded = true;
+});
+es.addEventListener('lesson', (e) => { $('lesson-text').value = JSON.parse(e.data).text; });
+// What Gemini heard, with slurred words it recovered from context highlighted: "the [neuron?]" → the <mark>neuron</mark>.
+let captionTimer;
+es.addEventListener('final', (e) => {
+  const parts = JSON.parse(e.data).text.split(/\[([^\]]+?)\?\]/); // odd entries are inferred words
+  $('caption').replaceChildren(...parts.map((p, i) => (i % 2 ? el('mark', 'inferred', p) : document.createTextNode(p))));
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => { $('caption').textContent = ''; }, 6000);
+});
+es.addEventListener('interim', (e) => { clearTimeout(captionTimer); $('caption').textContent = JSON.parse(e.data).text; });
+es.addEventListener('status', (e) => {
+  const s = JSON.parse(e.data);
+  if ('writing' in s) gecko.writing = s.writing;
+  if ('drawing' in s) gecko.drawing = !!s.drawing;
+  if ('error' in s) setStatus(s.error, !!s.error); // only problems show here; timings go to the server log
+  setPose();
+});
+es.addEventListener('board', (e) => {
+  setBoard(JSON.parse(e.data));
+});
+es.addEventListener('repeat', (e) => {
+  const line = JSON.parse(e.data);
+  if (line) show('SAID AGAIN', line.text);
+});
+es.addEventListener('recap', (e) => {
+  const r = JSON.parse(e.data);
+  show('RECAP', r.pending ? 'Writing recap…' : r.text, 30000);
+});
+
+// ---------- voice: say what the server asks, one clip at a time, through this laptop's (classroom) speakers ----------
+// ElevenLabs audio streams from /api/tts/<id>; without a key, or if it fails, the browser's own voice says it.
+// The server is told when we're speaking so the clip mic's copy of it isn't transcribed again.
+const queue = [], player = new Audio();
+let playing = false;
+function setSpeaking(on) {
+  playing = gecko.speaking = on;
+  setPose();
+  post('/api/playback', { playing: on });
+}
+function playNext() {
+  if (playing || !queue.length) return;
+  const s = queue.shift();
+  setSpeaking(true);
+  const done = () => { setSpeaking(false); playNext(); };
+  const browserVoice = () => {
+    const u = Object.assign(new SpeechSynthesisUtterance(s.text), { lang: 'en-CA' });
+    u.onend = u.onerror = done;
+    speechSynthesis.speak(u);
+  };
+  if (!s.voice) return browserVoice();
+  player.onended = done;
+  player.onerror = browserVoice;
+  player.src = `/api/tts/${s.id}`;
+  player.play().catch((err) => {
+    if (err.name !== 'NotAllowedError') return browserVoice();
+    // Browsers block sound until someone clicks the page once: keep the clip and ask for that click.
+    queue.unshift(s);
+    setSpeaking(false);
+    $('sound-btn').hidden = false;
+  });
+}
+$('sound-btn').onclick = () => { $('sound-btn').hidden = true; playNext(); };
+es.addEventListener('speak', (e) => { queue.push(JSON.parse(e.data)); playNext(); });
+const setMode = (m) => { $('mode-badge').hidden = !m.clearVoice; };
+es.addEventListener('mode', (e) => setMode(JSON.parse(e.data)));
+</script>
+</body>
+</html>

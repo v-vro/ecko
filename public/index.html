@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fffdf9">
+<title>Ecko · Keep teaching, in your own voice</title>
+<meta name="description" content="Ecko, made for teachers with ALS. Understands you. Writes for you. Speaks when you choose.">
+<link rel="icon" href="/assets/logo-head.png">
+<link rel="apple-touch-icon" href="/assets/logo-head.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Landing page: say what Ecko is in one glance, then send each device to its mode. Same paper, chalk and
+     foliage as the board and the phone. */
+  :root {
+    --paper: #fffdf9; --ink: #2d2a32; --ink-2: #5d5866; --muted: #9a96a0; --line: #ece6dc;
+    --forest: #33612a; --leaf: #6bb34a; --red: #ff5a5f;
+    --sage: #e8f4dd; --sage-edge: #b9dca1; --sage-ink: #2f5a26;
+    --butter: #fff2cf; --butter-edge: #f0d38a; --butter-ink: #7a4f12;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body { background: var(--paper); color: var(--ink); font: 500 17px/1.5 Fredoka, system-ui, sans-serif; overflow-x: hidden; }
+  .chalk {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 2.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 2.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+  }
+  /* One clean screen: logo, line, two doors. Centred vertically, garden underneath. */
+  main { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column;
+         justify-content: safe center; /* grows and scrolls instead of cutting off top and bottom on short screens */ padding: max(2vh, env(safe-area-inset-top)) 24px 11vh; } /* bottom = room for the garden */
+
+  /* ---- hero ---- */
+  .hero { text-align: center; padding: 0 0 3.5vh; }
+  .logo { display: block; height: clamp(84px, min(19vw, 20vh), 190px); margin: 0 auto 1.6vh; }
+  h1 { font-size: clamp(26px, min(5vw, 5.8vh), 56px); line-height: 1.05; margin: 0; color: var(--forest); font-weight: 700; }
+  h1 em { font-style: normal; color: var(--red); }
+  .lede { max-width: 680px; margin: 1.6vh auto 0; font-size: clamp(16px, min(2.3vw, 2.7vh), 22px); line-height: 1.4; font-weight: 600; color: var(--ink-2); }
+
+  /* ---- the two modes ---- */
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 10px; }
+  .mode { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 10px; min-height: clamp(150px, 28vh, 250px);
+          padding: 26px 24px 0 26px; border-radius: 30px; border: 2.5px solid var(--edge); background: var(--fill); color: var(--text);
+          text-decoration: none; box-shadow: 0 7px 0 var(--edge); transition: transform .1s, box-shadow .1s; overflow: visible; }
+  .mode:hover { transform: translateY(-3px); box-shadow: 0 10px 0 var(--edge); }
+  .mode:active { transform: translateY(4px); box-shadow: 0 3px 0 var(--edge); }
+  .mode:focus-visible { outline: 3px solid var(--forest); outline-offset: 4px; }
+  .mode.board { --fill: var(--sage); --edge: var(--sage-edge); --text: var(--sage-ink); }
+  .mode.phone { --fill: var(--butter); --edge: var(--butter-edge); --text: var(--butter-ink); }
+  .mode .copy { align-self: start; padding-bottom: 2.4vh; }
+  .mode .where { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; opacity: .75; }
+  .mode h2 { font-size: clamp(24px, min(3.4vw, 4.6vh), 40px); margin: 2px 0 4px; }
+  .mode p { margin: 0 0 1.6vh; font-size: clamp(14px, 1.9vh, 16px); opacity: .9; max-width: 25ch; }
+  .mode .go { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; background: #fff; padding: 10px 18px;
+              border-radius: 999px; border: 2px solid var(--edge); }
+  .mode .gecko { height: clamp(100px, 22vh, 190px); align-self: end; margin-bottom: -2px; }
+  .mode .deco { position: absolute; pointer-events: none; animation: sway var(--d, 5s) ease-in-out infinite alternate; transform-origin: 30% 90%; }
+  @keyframes sway { from { rotate: -3deg; } to { rotate: 3deg; } }
+
+  /* ---- foliage: vines down both sides, garden along the bottom ---- */
+  .vines { position: fixed; top: -30px; bottom: 0; width: 130px; display: flex; flex-direction: column; pointer-events: none; z-index: 0; overflow: hidden; }
+  .vines img { height: 36vh; width: auto; margin-top: -5vh; }
+  .vines img:nth-child(even) { transform: scaleX(-1); }
+  .vines.left { left: -30px; }
+  .vines.right { right: -30px; transform: scaleX(-1); }
+  .garden { position: fixed; left: 0; right: 0; bottom: 0; height: 110px; pointer-events: none; z-index: 0; overflow: hidden; }
+  .garden img { position: absolute; bottom: -4px; }
+
+  @media (max-width: 860px) {
+    .modes { grid-template-columns: 1fr; }
+    .mode { min-height: 0; padding-top: 2vh; }
+    .mode .gecko { height: clamp(90px, 15vh, 150px); }
+    .modes { gap: 2.4vh; }
+    .vines { width: 80px; } .vines.left { left: -40px; } .vines.right { right: -40px; }
+  }
+  @media (max-width: 520px) {
+    main { padding-left: 18px; padding-right: 18px; }
+    .lede { padding: 0 14px; }
+    .mode { grid-template-columns: 1fr 110px; padding: 20px 14px 0 20px; }
+    .mode .gecko { height: clamp(84px, 14vh, 130px); }
+  }
+  @media (max-width: 520px) and (max-height: 900px) { /* phones: tighter so it fits one screen */
+    main { padding-bottom: 80px; }
+    .logo { height: 76px; margin-bottom: 1vh; }
+    .hero { padding-bottom: 2.4vh; }
+    .mode { padding: 14px 12px 0 16px; min-height: 0; }
+    .mode .copy { padding-bottom: 14px; }
+    .mode .where { font-size: 11px; }
+    .mode p { margin-bottom: 10px; }
+    .mode .go { padding: 8px 14px; font-size: 15px; }
+    .mode .gecko { height: 104px; }
+    .garden { height: 70px; } .garden img { transform: scale(.75); transform-origin: bottom; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mode .deco { animation: none; } .mode, .mode:hover { transition: none; transform: none; } }
+</style>
+</head>
+<body>
+  <div class="vines left" aria-hidden="true">
+    <img src="/assets/vine-hanging.png" alt=""><img src="/assets/vine-curly.png" alt=""><img src="/assets/vine-hanging.png" alt=""><img src="/assets/vine-curly.png" alt="">
+  </div>
+  <div class="vines right" aria-hidden="true">
+    <img src="/assets/vine-curly.png" alt=""><img src="/assets/vine-hanging.png" alt=""><img src="/assets/vine-curly.png" alt=""><img src="/assets/vine-hanging.png" alt="">
+  </div>
+
+  <main>
+    <section class="hero">
+      <img class="logo" src="/assets/logo.png" alt="Ecko">
+      <h1 class="chalk">Keep teaching,<br><em>in your own voice.</em></h1>
+      <p class="lede">Made for teachers with ALS. Ecko understands you, writes for you, and speaks when you choose.</p>
+    </section>
+
+    <section class="modes" aria-label="Choose how this device is used">
+      <a class="mode board" href="/board">
+        <img class="deco" src="/assets/leaf-sprig.png" style="width:64px;left:-30px;top:-40px;--d:5s;rotate:-20deg" alt="">
+        <img class="deco" src="/assets/flower-red-small.png" style="width:28px;left:26px;top:-22px;--d:4s" alt="">
+        <div class="copy">
+          <div class="where">On the classroom screen</div>
+          <h2 class="chalk">Whiteboard</h2>
+          <p>Notes and diagrams appear as you talk.</p>
+          <span class="go">Open the board →</span>
+        </div>
+        <img class="gecko" src="/assets/gecko-writing.png" alt="">
+      </a>
+      <a class="mode phone" href="/phone">
+        <img class="deco" src="/assets/flower-orange.png" style="width:48px;right:-14px;top:-18px;--d:5.5s" alt="">
+        <img class="deco" src="/assets/flower-cream-2.png" style="width:30px;right:36px;top:-12px;--d:4.2s" alt="">
+        <div class="copy">
+          <div class="where">In your pocket</div>
+          <h2 class="chalk">Phone</h2>
+          <p>Your mic, plus one tap to repeat or recap.</p>
+          <span class="go">Open the phone app →</span>
+        </div>
+        <img class="gecko" src="/assets/gecko-talking.png" alt="">
+      </a>
+    </section>
+  </main>
+
+  <div class="garden" aria-hidden="true">
+    <img src="/assets/flower-patch.png" style="left:2%;height:86px" alt="">
+    <img src="/assets/leaf-sprig-dark.png" style="left:11%;height:58px" alt="">
+    <img src="/assets/pebbles.png" style="left:44%;height:18px;bottom:8px" alt="">
+    <img src="/assets/rocks-brown.png" style="right:20%;height:50px" alt="">
+    <img src="/assets/bush.png" style="right:2%;height:98px" alt="">
+  </div>
+</body>
+</html>
